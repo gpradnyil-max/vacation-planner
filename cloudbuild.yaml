@@ -1,0 +1,53 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:${_TAG}'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:latest'
+      - '.'
+
+  # Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:${_TAG}'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--min-instances=0'
+      - '--max-instances=3'
+      - '--set-env-vars=GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET=${_BQ_DATASET},BQ_LOCATION=${_BQ_LOCATION},DEFAULT_TRIP_ID=${_DEFAULT_TRIP_ID},DEFAULT_TRIP_NAME=${_DEFAULT_TRIP_NAME},DEFAULT_TRIP_START_DATE=${_DEFAULT_TRIP_START_DATE},DEFAULT_TRIP_TRAVELLERS=${_DEFAULT_TRIP_TRAVELLERS}'
+
+substitutions:
+  _SERVICE_NAME: vacation-planner
+  _REGION: europe-west2
+  _REPO: cloud-run-builds
+  # _TAG defaults to the Cloud Build BUILD_ID (always populated, unique per build).
+  # Override with --substitutions=_TAG=v1.2.3 when promoting a specific image.
+  _TAG: '${BUILD_ID}'
+  _BQ_DATASET: vacation_planner
+  _BQ_LOCATION: EU
+  _DEFAULT_TRIP_ID: my-vacation
+  _DEFAULT_TRIP_NAME: Our 7-day vacation
+  _DEFAULT_TRIP_START_DATE: '2026-06-05'
+  _DEFAULT_TRIP_TRAVELLERS: '2'
+
+options:
+  dynamic_substitutions: true
+  logging: CLOUD_LOGGING_ONLY
